@@ -5,9 +5,14 @@ A simple HTTP reverse proxy written in Go which has basic support for websockets
 # Installation
 
 1. Install golang [here](https://golang.org/doc/install).
-2. Run the following commands to install dependencies and build the proxy:
+2. Run the following command to install dependencies:
     ```
     go get github.com/gorilla/websocket
+    ```
+3. Run the following commands to clone the repo and build the proxy:
+    ```
+    git clone https://github.com/dli357/simple-go-reverse-proxy
+    cd simple-go-reverse-proxy
     go build
     ```
 
