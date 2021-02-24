@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 // Simple go proxy which supports websockets and inserts a specified header and value. Usage:
-//    ./simple-go-proxy --backend=<address:port> --port=<port> [--insert-header=<header> --insert-header-val=<header-value>]
+//    ./simple-go-proxy --backend=<address:port> --port=<port> [--insert-header=<header> --insert-header-val=<header-value>] [--websocket-scheme=<scheme>]
 package main
 
 import (
