@@ -38,6 +38,15 @@ var (
 	websocketScheme = flag.String("websocket-scheme", "ws", "The scheme to use for opening backend websocket connections. Default is `ws`.")
 )
 
+// A set of headers to strip out of the upgrade request during the cloning process.
+var stripHeaderNames = map[string]struct{}{
+	"Upgrade":                  {},
+	"Connection":               {},
+	"Sec-Websocket-Key":        {},
+	"Sec-Websocket-Version":    {},
+	"Sec-Websocket-Extensions": {},
+}
+
 func main() {
 	flag.Parse()
 
@@ -54,13 +63,16 @@ func main() {
 	backendProxy := httputil.NewSingleHostReverseProxy(backendURL)
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if websocket.IsWebSocketUpgrade(r) {
-			newHeader := http.Header{}
+			newHeaders := r.Header.Clone()
+			for header, _ := range stripHeaderNames {
+				newHeaders.Del(header)
+			}
 			if *insertHeader != "" {
-				newHeader.Add(*insertHeader, *insertHeaderVal)
+				newHeaders.Add(*insertHeader, *insertHeaderVal)
 			}
 			backendWebsocketURL := *backendURL
 			backendWebsocketURL.Scheme = *websocketScheme
-			backendConn, _, err := websocket.DefaultDialer.Dial(backendWebsocketURL.String(), newHeader)
+			backendConn, _, err := websocket.DefaultDialer.Dial(backendWebsocketURL.String(), newHeaders)
 			if err != nil {
 				log.Printf("Error opening websocket connection for request %v: %v", r.Host, err)
 				w.WriteHeader(500)

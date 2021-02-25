@@ -41,7 +41,10 @@ func main() {
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Request Receieved: %+v", r)
 		if websocket.IsWebSocketUpgrade(r) {
-			upgrader := websocket.Upgrader{}
+			upgrader := websocket.Upgrader{
+				// This should be fine since it is meant to be behind a proxy
+				CheckOrigin: func(r *http.Request) bool { return true },
+			}
 			clientConn, err := upgrader.Upgrade(w, r, nil)
 			if err != nil {
 				log.Printf("Error opening websocket connection for request %v: %v", r.Host, err)
