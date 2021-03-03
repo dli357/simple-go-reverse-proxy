@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 // Simple go proxy which supports websockets and inserts a specified header and value. Usage:
-//    ./simple-go-proxy --backend=<address:port> --port=<port> [--insert-header=<header> --insert-header-val=<header-value>] [--websocket-scheme=<scheme>]
+//    ./simple-go-proxy --backend=<address:port> --port=<port> [--insert-header=<header> --insert-header-val=<header-value> ...] [--websocket-scheme=<scheme>]
 package main
 
 import (
@@ -26,6 +26,7 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"strings"
 
 	"github.com/gorilla/websocket"
 )
@@ -33,10 +34,22 @@ import (
 var (
 	port            = flag.Int("port", 0, "Port on which to listen")
 	backend         = flag.String("backend", "", "URL of the backend HTTP server to proxy")
-	insertHeader    = flag.String("insert-header", "", "The header to inject into all requests")
-	insertHeaderVal = flag.String("insert-header-val", "test-value", "The value to inject for insert-header")
+	insertHeader    stringListFlag
+	insertHeaderVal stringListFlag
 	websocketScheme = flag.String("websocket-scheme", "ws", "The scheme to use for opening backend websocket connections. Default is `ws`.")
 )
+
+// Define a strings list flag.
+type stringListFlag []string
+
+func (s *stringListFlag) String() string {
+	return fmt.Sprintf("[%s]", strings.Join(*s, ", "))
+}
+
+func (s *stringListFlag) Set(value string) error {
+	*s = append(*s, value)
+	return nil
+}
 
 // A set of headers to strip out of the upgrade request during the cloning process.
 var stripHeaderNames = map[string]struct{}{
@@ -48,6 +61,8 @@ var stripHeaderNames = map[string]struct{}{
 }
 
 func main() {
+	flag.Var(&insertHeader, "insert-header", "The header names to inject into all requests. You may insert multiple headers by specifying this flag multiple times.")
+	flag.Var(&insertHeaderVal, "insert-header-val", "The header values to inject for insert-header. You may insert multiple headers by specifying this flag multiple times.")
 	flag.Parse()
 
 	if *backend == "" {
@@ -55,6 +70,9 @@ func main() {
 	}
 	if *port == 0 {
 		log.Fatal("You must specify a local port number on which to listen")
+	}
+	if len(insertHeader) != len(insertHeaderVal) {
+		log.Fatal("--insert-header and --insert-header-val flags must be specified the same number of times")
 	}
 	backendURL, err := url.Parse(*backend)
 	if err != nil {
@@ -64,11 +82,13 @@ func main() {
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if websocket.IsWebSocketUpgrade(r) {
 			newHeaders := r.Header.Clone()
-			for header, _ := range stripHeaderNames {
+			for header := range stripHeaderNames {
 				newHeaders.Del(header)
 			}
-			if *insertHeader != "" {
-				newHeaders.Add(*insertHeader, *insertHeaderVal)
+			if len(insertHeader) != 0 {
+				for idx, header := range insertHeader {
+					newHeaders.Add(header, insertHeaderVal[idx])
+				}
 			}
 			backendWebsocketURL := *backendURL
 			backendWebsocketURL.Scheme = *websocketScheme
@@ -92,8 +112,10 @@ func main() {
 			go proxyWebSocketMessagesOneWay(backendConn, clientConn)
 			return
 		}
-		if *insertHeader != "" {
-			r.Header.Add(*insertHeader, *insertHeaderVal)
+		if len(insertHeader) != 0 {
+			for idx, header := range insertHeader {
+				r.Header.Add(header, insertHeaderVal[idx])
+			}
 		}
 		backendProxy.ServeHTTP(w, r)
 	})
